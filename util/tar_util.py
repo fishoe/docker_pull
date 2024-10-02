@@ -39,9 +39,8 @@ def unzip(
     remove_zip_file: bool = True,
     progress: ProgressBar = EmptyProgressBar(),
 ):
-    with gzip.open(zip_file_path, "rb") as zip_data, open(
-        out_file_path, "wb"
-    ) as unzip_data:
+    with gzip.open(zip_file_path, "rb") as zip_data, \
+            open(out_file_path, "wb") as unzip_data:
         zip_data.myfileobj.seek(-4, 2)
         size_bytes = zip_data.myfileobj.read(4)
         zip_data.myfileobj.seek(0)
@@ -59,29 +58,27 @@ def unzip(
         os.remove(zip_file_path)
 
 def make_tar(out_path: Path, path: Path, created: float):
-    tar = tarfile.open(out_path, "w")
-    tar.tarinfo = TarInfo
-    tar.format = tarfile.USTAR_FORMAT
-    tarfile.RECORDSIZE = 512
+    with tarfile.open(out_path, "w") as tar:
+        tar.tarinfo = TarInfo
+        tar.format = tarfile.USTAR_FORMAT
+        tarfile.RECORDSIZE = 512
 
-    def mod(t: tarfile.TarInfo):
-        t.uid = 0
-        t.gid = 0
-        t.uname = ""
-        t.gname = ""
+        def mod(t: tarfile.TarInfo):
+            t.uid = 0
+            t.gid = 0
+            t.uname = ""
+            t.gname = ""
 
-        if t.name in ["manifest.json", "repositories"]:
-            t.mtime = 0
-        else:
-            t.mtime = created
+            if t.name in ["manifest.json", "repositories"]:
+                t.mtime = 0
+            else:
+                t.mtime = created
 
-        return t
+            return t
 
-    walk = []
-    for d in path.iterdir():
-        walk.append(d)
+        walk = []
+        for d in path.iterdir():
+            walk.append(d)
 
-    for d in sorted(walk):
-        tar.add(str(d.resolve()), str(d.relative_to(path)), filter=mod)
-
-    tar.close()
+        for d in sorted(walk):
+            tar.add(str(d.resolve()), str(d.relative_to(path)), filter=mod)
