@@ -141,6 +141,8 @@ class ImageParser:
 class ImageFetcher:
     __LST_MTYPE = "application/vnd.docker.distribution.manifest.list.v2+json"
     __IMG_MANIFEST_FORMAT = "application/vnd.docker.distribution.manifest.v2+json"
+    __OCI_IMAGE_MANIFEST_FORMAT = "application/vnd.oci.image.manifest.v1+json"
+    __OCI_IMAGE_INDEX_FORMAT = "application/vnd.oci.image.index.v1+json"
 
     def __init__(
         self,
@@ -278,9 +280,11 @@ class ImageFetcher:
         manifest = manifest_resp.json()
 
         if not img.manifest_digest:
-            if manifest["mediaType"] == self.__IMG_MANIFEST_FORMAT:
+            if manifest["mediaType"] == self.__IMG_MANIFEST_FORMAT or \
+                    manifest["mediaType"] == self.__OCI_IMAGE_MANIFEST_FORMAT:
                 self._pull_from_manifest(img, manifest)
-            elif manifest["mediaType"] == self.__LST_MTYPE:
+            elif manifest["mediaType"] == self.__LST_MTYPE or \
+                    manifest["mediaType"] == self.__OCI_IMAGE_INDEX_FORMAT:
                 self._pull_from_mainfest_list(img, manifest, platform)
         else:
             img_name_n = img.image.replace("/", "_")
@@ -294,11 +298,12 @@ class ImageFetcher:
 
         print("Digest:", img.image_digest, "\n")
 
-    def _manifests(self, manifest_list: dict, platform: str) -> list:
-        img_os, img_arch = image_platform(platform)
-        manifests = manifest_list.get("manifests", [])
-        if manifest_list.get("schemaVersion") == 1:
+    def _manifests(self, manifest: dict, platform: str) -> list:
+        if manifest.get("schemaVersion") == 1:
             raise ValueError("schema version 1 image manifest not supported")
+        img_os, img_arch = image_platform(platform)
+        print(f"Platform: {img_os}/{img_arch}")
+        manifests = manifest.get("manifests", [])
 
         if not img_os and not img_arch:
             return manifests
