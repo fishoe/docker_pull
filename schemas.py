@@ -1,6 +1,6 @@
 import dataclasses
 import json
-from json_util import JSON_SEPARATOR, StructClassesJSONEncoder
+from util import JSON_SEPARATOR, StructClassesJSONEncoder
 
 @dataclasses.dataclass
 class StructClasses:

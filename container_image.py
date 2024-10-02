@@ -9,7 +9,7 @@ from registry import Registry
 from posixpath import join as path_join
 from progress_bar import EmptyProgressBar, ProgressBar
 from files_manager import FilesManager
-from json_util import JSONDecoderRawString, JSON_SEPARATOR
+from util.json_util import JSONDecoderRawString, JSON_SEPARATOR
 from schemas import Manifest, ManifestList, V1Image, ContainerConfig, LayerConfig
 from util import make_tar, date_parse, image_platform
 

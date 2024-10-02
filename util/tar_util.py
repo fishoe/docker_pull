@@ -1,62 +1,37 @@
-import datetime
-import hashlib
-from pathlib import Path
-import platform as os_platform
+import tarfile
+import struct
 import struct
 import gzip
 import os
-import tarfile
+from pathlib import Path
 
-from tar_util import TarInfo
 from progress_bar import ProgressBar, EmptyProgressBar
 
-def date_parse(s: str) -> datetime.datetime:
-    layout = "%Y-%m-%dT%H:%M:%S.%f%z"
+class TarInfo(tarfile.TarInfo):
+    @staticmethod
+    def _create_header(info, fmt, encoding, errors):
+        parts = [
+            tarfile.stn(info.get("name", ""), 100, encoding, errors),
+            tarfile.itn(info.get("mode", 0) & 0o7777, 8, fmt),
+            tarfile.itn(info.get("uid", 0), 8, fmt),
+            tarfile.itn(info.get("gid", 0), 8, fmt),
+            tarfile.itn(info.get("size", 0), 12, fmt),
+            tarfile.itn(info.get("mtime", 0), 12, fmt),
+            b"        ",  # checksum field
+            info.get("type", tarfile.REGTYPE),
+            tarfile.stn(info.get("linkname", ""), 100, encoding, errors),
+            info.get("magic", tarfile.POSIX_MAGIC),
+            tarfile.stn(info.get("uname", ""), 32, encoding, errors),
+            tarfile.stn(info.get("gname", ""), 32, encoding, errors),
+            tarfile.itn(info.get("devmajor", 0), 8, fmt),
+            tarfile.itn(info.get("devminor", 0), 8, fmt),
+            tarfile.stn(info.get("prefix", ""), 155, encoding, errors),
+        ]
 
-    # remove Z at the end of the line
-    if s.endswith("Z"):
-        s = s[:-1]
+        buf = struct.pack("%ds" % tarfile.BLOCKSIZE, b"".join(parts))
+        chksum = tarfile.calc_chksums(buf[-tarfile.BLOCKSIZE :])[0]
 
-    nano_s = 0
-    datetime_parts = s.split(".")
-    if len(datetime_parts) == 2:
-        nano_s = datetime_parts[-1]
-        # cut nanoseconds to microseconds
-        if len(nano_s) > 6:
-            nano_s = nano_s[:6]
-
-    dt = "{}.{}+00:00".format(datetime_parts[0], nano_s)
-
-    return datetime.datetime.strptime(dt, layout)
-
-
-def www_auth(hdr: str) -> tuple[str, dict]:
-    auth_scheme, info = hdr.split(" ", 1)
-
-    out = {}
-    for part in info.split(","):
-        k, v = part.split("=", 1)
-        out[k] = v.replace('"', "").strip()
-
-    return auth_scheme, out
-
-
-def sha256sum(name: str | Path, chunk_num_blocks: int = 128) -> str:
-    h = hashlib.sha256()
-
-    with open(name, "rb", buffering=0) as f:
-        while chunk := f.read(chunk_num_blocks * h.block_size):
-            h.update(chunk)
-
-    return h.hexdigest()
-
-def image_platform(s: str) -> tuple[str, str]:
-    _os, arch = "linux", os_platform.machine()
-    if s:
-        _os, arch = s.split("/")
-
-    return _os, arch
-
+        return buf[:-364] + bytes("%06o\0" % chksum, "ascii") + buf[-357:]
 
 def unzip(
     zip_file_path: str | Path,
@@ -82,7 +57,6 @@ def unzip(
 
     if remove_zip_file:
         os.remove(zip_file_path)
-
 
 def make_tar(out_path: Path, path: Path, created: float):
     tar = tarfile.open(out_path, "w")
